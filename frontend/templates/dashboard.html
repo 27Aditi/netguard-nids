@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>NetGuard NIDS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #060910;
+            font-family: 'Space Grotesk';
+            color: #e2e8f0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .navbar
+        {
+            background: #0d1117;
+            border-bottom: 1px solid #1f2937;
+            height: 46px;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .nav-left
+        {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .nav-title
+        {
+            font-size: 13px;
+            font-weight: 500;
+            color: #e2e8f0;
+        }
+        .nav-version
+        {
+            font-size: 10px;
+            color: #374151;
+        }
+        .nav-right
+        {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .status-pill
+        {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid #10b98130;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 10px;
+            color: #10b981;
+        }
+        .status-dot
+        {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse
+        {
+            0%, 100% { opacity: 1;}
+            50% { opacity: 0.4;}
+        }
+        .layout 
+        {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .sidebar 
+        {
+            width: 190px;
+            background: #0d1117;
+            border-right: 1px solid #1f2937;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow-y: auto;
+            padding: 14px 12px;
+        }
+        .sec-label 
+        {
+            font-size: 9px;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 8px;
+        }
+        .mode-item 
+        {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 9px;
+            border-radius: 6px;
+            margin-bottom: 3px;
+            cursor: pointer;
+        }
+        .mode-item.active 
+        {
+            background: #7c6af718;
+            border: 1px solid #7c6af733;
+        }
+        .mode-dot 
+        {  
+            width: 6px; 
+            height: 6px; 
+            border-radius: 50%; 
+            background: #7c6af7; 
+        }
+        .mode-dot.gray 
+        { 
+            background: #374151; 
+        }
+        .mode-text 
+        { 
+            font-size: 11px; 
+            color: #6b7280; 
+        }
+        .mode-text.active 
+        { 
+            color: #a89df7; 
+        }
+        .divider 
+        { 
+            height: 1px; 
+            background: #1f2937; 
+            margin: 12px 0; 
+        }
+        .session-item 
+        {
+            padding: 8px 9px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            border: 1px solid #1f2937;
+            cursor: pointer;
+        }
+        .session-item:hover 
+        { 
+            border-color: #374151; 
+        }
+        .session-name 
+        { 
+            font-size: 11px; 
+            color: #9ca3af; 
+            margin-bottom: 3px; 
+        }
+        .session-name.attack 
+        { 
+            color: #f87171; 
+        }
+        .session-meta 
+        { 
+            font-size: 10px; 
+            color: #374151; 
+        }
+        .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        }
+
+        .main-header {
+        padding: 10px 16px;
+        border-bottom: 1px solid #1f2937;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        width: 100%;
+        }
+
+        .file-name {
+        font-size: 11px;
+        color: #4b5563;
+        background: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 6px;
+        padding: 5px 12px;
+        }
+
+        .btn-group { display: flex; gap: 8px; }
+
+        .btn-analyze {
+        background: #ef444418;
+        border: 1px solid #ef444433;
+        border-radius: 6px;
+        padding: 6px 14px;
+        color: #f87171;
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        }
+        .btn-analyze:hover { background: #ef444430; }
+
+        .btn-upload {
+        background: #7c6af7;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 14px;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        }
+        .btn-upload:hover { background: #6d5ce6; }
+
+        input[type="file"] { display: none; }
+
+        .stats-row {
+        display: flex;
+        border-bottom: 1px solid #1f2937;
+        flex-shrink: 0;
+        }
+
+        .stat-item {
+        flex: 1;
+        padding: 10px 16px;
+        border-right: 1px solid #1f2937;
+        }
+        .stat-item:last-child { border-right: none; }
+
+        .stat-label {
+        font-size: 9px;
+        color: #4b5563;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        margin-bottom: 5px;
+        }
+
+        .stat-value {
+        font-size: 20px;
+        font-weight: 500;
+        color: #a89df7;
+        }
+
+        .stat-value.green { color: #10b981; }
+        .stat-value.red { color: #f87171; }
+        .stat-value.amber { color: #f59e0b; }
+
+                .main-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .chart-section {
+            flex: 1;
+            padding: 16px;
+            border-right: 1px solid #1f2937;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-title {
+            font-size: 10px;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chart-legend {
+            display: flex;
+            gap: 12px;
+        }
+
+        .leg {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            color: #4b5563;
+        }
+
+        .leg-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .chart-wrap {
+            flex: 1;
+            position: relative;
+        }
+
+        .threshold-line {
+            border-top: 1px dashed #7c6af744;
+            padding-top: 6px;
+            margin-top: 8px;
+        }
+
+        .threshold-text {
+            font-size: 9px;
+            color: #7c6af7;
+        }
+
+        .verdict-section {
+            width: 200px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .verdict-card {
+            background: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 8px;
+            padding: 14px;
+            text-align: center;
+        }
+
+        .verdict-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #10b98118;
+            border: 1px solid #10b98133;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-size: 16px;
+            color: #10b981;
+        }
+
+        .verdict-icon.attack {
+            background: #f8717118;
+            border-color: #f8717133;
+            color: #f87171;
+        }
+
+        .verdict-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #10b981;
+            margin-bottom: 5px;
+        }
+
+        .verdict-title.attack { color: #f87171; }
+
+        .verdict-sub {
+            font-size: 9px;
+            color: #4b5563;
+            line-height: 1.6;
+        }
+
+        .score-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .score-row {
+            background: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 6px;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .score-row-label {
+            font-size: 10px;
+            color: #4b5563;
+        }
+
+        .score-row-val {
+            font-size: 12px;
+            font-weight: 500;
+            color: #a89df7;
+        }
+
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .empty-icon {
+            font-size: 32px;
+            opacity: 0.2;
+        }
+
+        .empty-text {
+            font-size: 12px;
+            color: #374151;
+        }
+
+                .confidence-bar-wrap {
+            padding: 8px 16px;
+            border-top: 1px solid #1f2937;
+            flex-shrink: 0;
+        }
+
+        .confidence-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            color: #4b5563;
+            margin-bottom: 5px;
+        }
+
+        .confidence-track {
+            height: 5px;
+            background: #1f2937;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: #7c6af7;
+            width: 0%;
+            transition: width 0.6s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-left">
+            <span class="nav-title">NetGuard NIDS</span>
+            <span class="nav-version">v1.0</span>
+        </div>
+        <div class="nav-right">
+            <div class="status-pill">
+                <div class="status-dot"></div>
+                Ready
+            </div>
+        </div>
+    </div>
+    <div class="layout">
+
+    <div class="sidebar">
+      <div class="sec-label">Mode</div>
+      <div class="mode-item active" id="mode-upload">
+        <div class="mode-dot"></div>
+        <span class="mode-text active">Upload PCAP</span>
+      </div>
+      <div class="mode-item" id="mode-history">
+        <div class="mode-dot gray"></div>
+        <span class="mode-text">Session history</span>
+      </div>
+      <div class="mode-item" id="mode-model">
+        <div class="mode-dot gray"></div>
+        <span class="mode-text">Model info</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="sec-label">Past sessions</div>
+      <div id="session-list">
+        <div style="font-size:10px;color:#374151;">No sessions yet</div>
+      </div>
+    </div>
+
+    <div class="main">
+
+      <div class="main-header">
+        <div class="file-name" id="file-name">No file selected</div>
+        <div class="btn-group">
+          <div class="btn-analyze" id="analyze-btn">Analyze</div>
+          <label for="file-input" class="btn-upload">↑ Upload PCAP</label>
+          <input type="file" id="file-input" accept=".pcap,.pcapng" />
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-item">
+          <div class="stat-label">Total Connections</div>
+          <div class="stat-value" id="stat-flows">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Risk Level</div>
+          <div class="stat-value" id="stat-risk">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Network Status</div>
+          <div class="stat-value" id="stat-status">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Verdict</div>
+          <div class="stat-value" id="stat-verdict">—</div>
+        </div>
+      </div>
+            <div class="main-body">
+
+        <div class="chart-section">
+          <div class="chart-title">
+            <span>Combined probability score — per flow</span>
+            <div class="chart-legend">
+              <div class="leg"><div class="leg-dot" style="background:#7c6af7;"></div>Normal</div>
+              <div class="leg"><div class="leg-dot" style="background:#f87171;"></div>Attack</div>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div class="empty-state" id="empty-state">
+              <div class="empty-icon">📡</div>
+              <div class="empty-text">Upload a PCAP file to begin analysis</div>
+            </div>
+            <canvas id="score-chart" style="display:none;"></canvas>
+          </div>
+          <div class="threshold-line">
+            <span class="threshold-text">— Alert Boundary · 0.30</span>
+          </div>
+          <div class="confidence-bar-wrap">
+            <div class="confidence-label">
+              <span id="confidence-label-text">Awaiting analysis</span>
+              <span id="confidence-pct" style="font-weight:500;">—</span>
+            </div>
+            <div class="confidence-track">
+              <div class="confidence-fill" id="confidence-fill"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="verdict-section">
+          <div class="verdict-card" id="verdict-card">
+            <div class="verdict-icon" id="verdict-icon">?</div>
+            <div class="verdict-title" id="verdict-title">Awaiting analysis</div>
+            <div class="verdict-sub" id="verdict-sub">Upload a PCAP file and click Analyze to begin</div>
+          </div>
+          <div class="score-wrap">
+            <div class="score-row">
+              <span class="score-row-label">Threat Intensity</span>
+              <span class="score-row-val" id="score-threat">—</span>
+            </div>
+            <div class="score-row">
+              <span class="score-row-label">Traffic Behavior</span>
+              <span class="score-row-val" id="score-behavior">—</span>
+            </div>
+            <div class="score-row">
+              <span class="score-row-label">Peak at flow</span>
+              <span class="score-row-val" id="score-peak">—</span>
+            </div>
+            <div class="score-row" style="flex-direction: column; align-items: flex-start; gap: 5px;">
+              <span class="score-row-label">Analyst note</span>
+              <span class="score-row-val" id="score-note" style="font-size:10px; color:#6b7280; font-weight:400; line-height:1.5;">—</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+   <div id="model-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#00000088; z-index:100; align-items:center; justify-content:center;">
+    <div style="background:#0d1117; border:1px solid #1f2937; border-radius:12px; padding:24px; width:380px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <span style="font-size:13px; font-weight:500; color:#e2e8f0;">Model information</span>
+        <span id="close-model" style="color:#4b5563; cursor:pointer; font-size:16px;">✕</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="background:#111827; border:1px solid #1f2937; border-radius:6px; padding:10px 12px;">
+          <div style="font-size:9px; color:#4b5563; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.6px;">Ensemble classifiers</div>
+          <div style="font-size:11px; color:#a89df7;">Random Forest · LightGBM · XGBoost</div>
+        </div>
+        <div style="background:#111827; border:1px solid #1f2937; border-radius:6px; padding:10px 12px;">
+          <div style="font-size:9px; color:#4b5563; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.6px;">Anomaly detection</div>
+          <div style="font-size:11px; color:#a89df7;">Isolation Forest</div>
+        </div>
+        <div style="background:#111827; border:1px solid #1f2937; border-radius:6px; padding:10px 12px;">
+          <div style="font-size:9px; color:#4b5563; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.6px;">Combination method</div>
+          <div style="font-size:11px; color:#a89df7;">Bayesian combination · 50/50 weight</div>
+        </div>
+        <div style="background:#111827; border:1px solid #1f2937; border-radius:6px; padding:10px 12px;">
+          <div style="font-size:9px; color:#4b5563; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.6px;">Training dataset</div>
+          <div style="font-size:11px; color:#a89df7;">UNSW-NB15</div>
+        </div>
+        <div style="background:#111827; border:1px solid #1f2937; border-radius:6px; padding:10px 12px;">
+          <div style="font-size:9px; color:#4b5563; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.6px;">Features extracted</div>
+          <div style="font-size:11px; color:#a89df7;">32 flow-level features via NFStream</div>
+        </div>
+        <div style="background:#111827; border:1px solid #1f2937; border-radius:6px; padding:10px 12px;">
+          <div style="font-size:9px; color:#4b5563; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.6px;">Alert threshold</div>
+          <div style="font-size:11px; color:#a89df7;">0.30 combined Bayesian score</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const FASTAPI_URL = 'http://localhost:8000';
+
+    let uploadedFile = null;
+    let scoreChart   = null;
+
+    // ── FILE UPLOAD ──
+    document.getElementById('file-input').addEventListener('change', function(e) {
+      uploadedFile = e.target.files[0];
+      if (uploadedFile) {
+        document.getElementById('file-name').textContent = uploadedFile.name;
+        document.getElementById('file-name').style.color = '#a89df7';
+      }
+    });
+
+    // ── ANALYZE ──
+    document.getElementById('analyze-btn').addEventListener('click', async function() {
+      if (!uploadedFile) {
+        alert('Please upload a PCAP file first');
+        return;
+      }
+
+      // show analyzing state
+      document.getElementById('analyze-btn').textContent = 'Analyzing...';
+      document.getElementById('analyze-btn').style.opacity = '0.5';
+      document.getElementById('analyze-btn').style.pointerEvents = 'none';
+
+      try {
+        const formData = new FormData();
+        formData.append('file', uploadedFile);
+
+        const response = await fetch(`${FASTAPI_URL}/analyze`, {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+        renderResult(result);
+        addSession(result, uploadedFile.name);
+
+      } catch (err) {
+        alert('Error connecting to backend. Make sure FastAPI is running.');
+      } finally {
+        document.getElementById('analyze-btn').textContent = 'Analyze';
+        document.getElementById('analyze-btn').style.opacity = '1';
+        document.getElementById('analyze-btn').style.pointerEvents = 'auto';
+      }
+    });
+
+    // ── RENDER RESULT ──
+      function renderResult(result) {
+      const isAttack = result.verdict === 'ATTACK';
+
+      // ── stats row ──
+      document.getElementById('stat-flows').textContent  = result.total_flows;
+
+      const riskEl = document.getElementById('stat-risk');
+      riskEl.textContent = result.risk_level;
+      riskEl.className   = 'stat-value ' + (
+        result.risk_level === 'Low'    ? 'green' :
+        result.risk_level === 'Medium' ? 'amber' : 'red'
+      );
+
+      const statusEl = document.getElementById('stat-status');
+      statusEl.textContent = result.network_status;
+      statusEl.className   = 'stat-value ' + (
+        result.network_status === 'Safe'       ? 'green' :
+        result.network_status === 'Suspicious' ? 'amber' : 'red'
+      );
+
+      const verdictEl = document.getElementById('stat-verdict');
+      verdictEl.textContent = isAttack ? 'Attack' : 'Normal';
+      verdictEl.className   = 'stat-value ' + (isAttack ? 'red' : 'green');
+
+      // ── verdict card ──
+      document.getElementById('verdict-icon').textContent = isAttack ? '✕' : '✓';
+      document.getElementById('verdict-icon').className   = 'verdict-icon ' + (isAttack ? 'attack' : '');
+      document.getElementById('verdict-title').textContent = isAttack ? 'Attack detected' : 'Normal traffic';
+      document.getElementById('verdict-title').className   = 'verdict-title ' + (isAttack ? 'attack' : '');
+      document.getElementById('verdict-sub').textContent   = result.analyst_note;
+
+      // ── score rows ──
+      const threatEl = document.getElementById('score-threat');
+      threatEl.textContent = result.threat_intensity + '%';
+      threatEl.style.color = result.threat_intensity < 40 ? '#10b981' :
+                             result.threat_intensity < 60 ? '#f59e0b' : '#f87171';
+
+      const behaviorEl = document.getElementById('score-behavior');
+      behaviorEl.textContent = result.traffic_behavior;
+      behaviorEl.style.color = result.traffic_behavior === 'Stable'   ? '#10b981' :
+                               result.traffic_behavior === 'Unstable' ? '#f59e0b' : '#f87171';
+
+      document.getElementById('score-peak').textContent  = 'Flow ' + result.peak_flow_index;
+      document.getElementById('score-note').textContent  = result.analyst_note;
+
+      // ── chart ──
+      renderChart(result);
+
+      const fill     = document.getElementById('confidence-fill');
+      const pct      = document.getElementById('confidence-pct');
+      const labelTxt = document.getElementById('confidence-label-text');
+
+      const safetyScore     = isAttack ? Math.round(100 - result.threat_intensity) : Math.round(100 - result.threat_intensity);
+      fill.style.width      = safetyScore + '%';
+      fill.style.background = safetyScore >= 60 ? '#10b981' : safetyScore >= 40 ? '#f59e0b' : '#f87171';
+      pct.textContent       = safetyScore + '% safe';
+      labelTxt.textContent  = 'Session safety score';
+    }
+
+      function rollingAverage(data, window) {
+      return data.map((_, i) => {
+        const start = Math.max(0, i - window + 1);
+        const slice = data.slice(start, i + 1);
+        return parseFloat((slice.reduce((a, b) => a + b, 0) / slice.length).toFixed(4));
+      });
+    }
+    // ── RENDER CHART ──
+      function renderChart(result) {
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('score-chart').style.display = 'block';
+
+      const raw      = result.all_flow_scores;
+      const scores   = rollingAverage(raw, 10);
+      const labels   = scores.map((_, i) => 'Flow ' + (i + 1));
+      const threshold  = 0.30;
+      const isAttack   = result.verdict === 'ATTACK';
+      const lineColor  = isAttack ? '#f87171' : '#7c6af7';
+      const fillColor  = isAttack ? 'rgba(248,113,113,0.08)' : 'rgba(124,106,247,0.08)'
+
+      if (scoreChart) scoreChart.destroy();
+
+      const ctx = document.getElementById('score-chart').getContext('2d');
+      scoreChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Threat score',
+              data: scores,
+              borderColor: lineColor,
+              backgroundColor: fillColor,
+              borderWidth: 2,
+              pointBackgroundColor: lineColor,
+              pointRadius: raw.length > 100 ? 0 : 4,
+              pointHoverRadius: 6,
+              fill: true,
+              tension: 0.4,
+            },
+            {
+              label: 'Alert boundary',
+              data: scores.map(() => threshold),
+              borderColor: '#f59e0b',
+              borderWidth: 1,
+              borderDash: [6, 4],
+              pointRadius: 0,
+              fill: false,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              labels: {
+                color: '#4b5563',
+                font: { size: 10 },
+                boxWidth: 12,
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => `Score: ${ctx.raw}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#4b5563', font: { size: 9 } },
+              grid:  { color: '#1f2937' }
+            },
+            y: {
+              min: 0,
+              max: 1,
+              ticks: { color: '#4b5563', font: { size: 9 } },
+              grid:  { color: '#1f2937' }
+            }
+          }
+        }
+      });
+    }
+
+    // ── ADD SESSION TO SIDEBAR ──
+    function addSession(result, filename) {
+      const list     = document.getElementById('session-list');
+      const isAttack = result.verdict === 'ATTACK';
+
+      const noSessions = list.querySelector('div[style]');
+      if (noSessions) noSessions.remove();
+
+      const item = document.createElement('div');
+      item.className = 'session-item';
+      item.innerHTML = `
+        <div class="session-name ${isAttack ? 'attack' : ''}">${isAttack ? 'Attack detected' : 'Normal traffic'}</div>
+        <div class="session-meta">${filename} · ${result.total_flows} flows</div>
+      `;
+      list.prepend(item);
+    }
+     document.getElementById('mode-upload').addEventListener('click', function() {
+      setActiveMode('mode-upload');
+      document.getElementById('file-input').click();
+    });
+
+    document.getElementById('mode-history').addEventListener('click', function() {
+      setActiveMode('mode-history');
+      document.getElementById('session-list').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    document.getElementById('mode-model').addEventListener('click', function() {
+      setActiveMode('mode-model');
+      document.getElementById('model-overlay').style.display = 'flex';
+    });
+
+    document.getElementById('model-overlay').addEventListener('click', function(e) {
+      if (e.target === this || e.target.id === 'close-model') {
+        this.style.display = 'none';
+        setActiveMode('mode-upload');
+      }
+    });
+
+    function setActiveMode(activeId) {
+      const modes = ['mode-upload', 'mode-history', 'mode-model'];
+      modes.forEach(id => {
+        const el  = document.getElementById(id);
+        const dot = el.querySelector('.mode-dot');
+        const txt = el.querySelector('.mode-text');
+        if (id === activeId) {
+          el.classList.add('active');
+          dot.classList.remove('gray');
+          txt.classList.add('active');
+        } else {
+          el.classList.remove('active');
+          dot.classList.add('gray');
+          txt.classList.remove('active');
+        }
+      });
+    }
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.textContent = message;
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: #111827;
+        border: 1px solid #1f2937;
+        color: #9ca3af;
+        font-size: 11px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        z-index: 200;
+        font-family: 'Space Grotesk';
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+  </script>  
+ 
+</body>
+</html>

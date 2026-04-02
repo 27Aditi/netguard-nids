@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+python-multipart
+flask
+requests
+nfstream
+scapy
+numpy
+pandas
+scikit-learn
+xgboost
+lightgbm
+joblib
