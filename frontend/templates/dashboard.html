@@ -603,7 +603,7 @@
     </div>
   </div>
   <script>
-    const FASTAPI_URL = 'http://localhost:8000';
+    const FASTAPI_URL = '';
 
     let uploadedFile = null;
     let scoreChart   = null;
@@ -633,7 +633,7 @@
         const formData = new FormData();
         formData.append('file', uploadedFile);
 
-        const response = await fetch(`${FASTAPI_URL}/analyze`, {
+        const response = await fetch(`/analyze`, {
           method: 'POST',
           body: formData
         });

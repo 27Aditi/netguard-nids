@@ -4,6 +4,7 @@ import os, shutil, tempfile
 from pipelines.feature_extraction import extract_all_features
 from pipelines.prediction import load_artifacts, run_prediction
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 @asynccontextmanager
 async def lifespan(app):
@@ -20,6 +21,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+def root():
+    return FileResponse("templates/dashboard.html")
 
 @app.get('/health')
 def health():
