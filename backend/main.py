@@ -1,8 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, Request
 from contextlib import asynccontextmanager
 import os, shutil, tempfile
-from pipelines.feature_extraction import extract_all_features
-from pipelines.prediction import load_artifacts, run_prediction
+from backend.pipelines.feature_extraction import extract_all_features
+from backend.pipelines.prediction import load_artifacts, run_prediction
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
