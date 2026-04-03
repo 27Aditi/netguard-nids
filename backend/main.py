@@ -24,7 +24,7 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return FileResponse("templates/dashboard.html")
+    return FileResponse("frontend/templates/dashboard.html")
 
 @app.get('/health')
 def health():
