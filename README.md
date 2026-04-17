@@ -162,5 +162,4 @@ Open `http://localhost:5000` in your browser.
 ## Author
 
 Aditi Bhatnagar  
-B.Tech — [Your Branch]  
-[Your College]
+B.Tech — Computer Science & Engineering
