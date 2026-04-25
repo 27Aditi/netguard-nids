@@ -1,7 +1,4 @@
-fastapi
-uvicorn
-python-multipart
-flask
+streamlit
 requests
 nfstream
 scapy
@@ -11,4 +8,3 @@ scikit-learn
 xgboost
 lightgbm
 joblib
-gunicorn
