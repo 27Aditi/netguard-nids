@@ -3,9 +3,6 @@ import joblib
 import numpy as np
 import pandas as pd
 
-# ================================================================
-# Constants
-# ================================================================
 
 ALL_42_FEATURES = [
     'dur', 'proto', 'service', 'state',
@@ -40,16 +37,7 @@ IF_WEIGHT       = 0.5
 ATTACK_RATIO_THRESHOLD = 0.3
 
 
-# ================================================================
-# STEP 1 — Load all artifacts (called once at startup)
-# ================================================================
-
 def load_artifacts(models_dir: str) -> dict:
-    """
-    Load all saved models, scalers, encoders, and feature order.
-    Pass models_dir as the path to your backend/models/ folder.
-    Returns a dict of all loaded artifacts.
-    """
     import os
     p = models_dir
 
@@ -85,25 +73,13 @@ def load_artifacts(models_dir: str) -> dict:
     }
 
 
-# ================================================================
-# STEP 2-9 — Preprocess raw_df into model-ready X_df
-# ================================================================
-
 def preprocess(raw_df: pd.DataFrame, artifacts: dict) -> pd.DataFrame:
-    """
-    Encode categoricals, fill missing features, scale, drop unwanted
-    columns, and reorder to match nids_features.
-    Input  : raw_df from feature_extraction.extract_all_features()
-    Output : scaled X_df ready for ensemble + IF
-    """
     encoders      = artifacts['encoders']
     scaler        = artifacts['scaler']
     nids_features = artifacts['nids_features']
 
-    # Step 2 — work on copy
     extracted_df = raw_df.copy()
 
-    # Step 3 — encode categorical columns
     for col, fallback in CAT_COLS_FALLBACK.items():
         known_values = encoders[col].classes_
         extracted_df[col] = extracted_df[col].apply(
@@ -111,31 +87,21 @@ def preprocess(raw_df: pd.DataFrame, artifacts: dict) -> pd.DataFrame:
         )
         extracted_df[col] = encoders[col].transform(extracted_df[col])
 
-    # Step 5 — fill missing features with 0
     for feature in TO_FILL_ZERO:
         extracted_df[feature] = 0
 
-    # Step 6 — reorder to all 42, replace inf/nan
     extracted_df = extracted_df[ALL_42_FEATURES]
     extracted_df = extracted_df.replace([np.inf, -np.inf], 0)
     extracted_df = extracted_df.fillna(0)
 
-    # Step 7 — scale all 42 using ensemble scaler
     X_scaled = scaler.transform(extracted_df)
     X_df     = pd.DataFrame(X_scaled, columns=ALL_42_FEATURES)
 
-    # Step 8 — drop unwanted features
     X_df.drop(columns=TO_FILL_ZERO, inplace=True)
 
-    # Step 9 — match nids_features order
     X_df = X_df[nids_features]
 
     return X_df
-
-
-# ================================================================
-# STEP 10-11 — Isolation Forest scoring
-# ================================================================
 
 def run_isolation_forest(X_df: pd.DataFrame, artifacts: dict) -> tuple:
     """
@@ -146,14 +112,12 @@ def run_isolation_forest(X_df: pd.DataFrame, artifacts: dict) -> tuple:
     if_scaler        = artifacts['if_scaler']
     if_feature_order = artifacts['if_feature_order']
 
-    # Step 10 — scale IF features and run IF
     X_df_if     = X_df[if_feature_order]
     X_if_scaled = if_scaler.transform(X_df_if)
 
     if_scores      = iso_forest.decision_function(X_if_scaled)
     if_predictions = iso_forest.predict(X_if_scaled)
 
-    # Step 11 — flip and normalize to get attack probability
     if_scores_flipped = -if_scores
     if_min = if_scores_flipped.min()
     if_max = if_scores_flipped.max()
@@ -166,10 +130,6 @@ def run_isolation_forest(X_df: pd.DataFrame, artifacts: dict) -> tuple:
     return if_attack_prob, if_predictions
 
 
-# ================================================================
-# STEP 12 — Ensemble prediction probabilities
-# ================================================================
-
 def run_ensemble(X_df: pd.DataFrame, artifacts: dict) -> np.ndarray:
     """
     Run RF + LightGBM + XGBoost, return averaged attack probability.
@@ -180,10 +140,6 @@ def run_ensemble(X_df: pd.DataFrame, artifacts: dict) -> np.ndarray:
 
     return (prob_xgb + prob_lgbm + prob_rf) / 3
 
-
-# ================================================================
-# STEP 13-14 — Bayesian combination + final verdict
-# ================================================================
 
 def combine_and_decide(
     ensemble_prob: np.ndarray,
@@ -196,10 +152,8 @@ def combine_and_decide(
     """
     threshold = artifacts['threshold']
 
-    # Step 13 — weighted combination
     combined_prob = (ENSEMBLE_WEIGHT * ensemble_prob) + (IF_WEIGHT * if_attack_prob)
 
-    # Step 14 — final predictions
     final_predictions = (combined_prob >= threshold).astype(int)
 
     total_flows   = len(final_predictions)
@@ -208,7 +162,6 @@ def combine_and_decide(
 
     verdict       = 'ATTACK' if attack_ratio >= ATTACK_RATIO_THRESHOLD else 'NORMAL'
 
-    # ── Derived user-friendly values ──
     threat_intensity = round(float(combined_prob.mean()) * 100, 1)
 
     if verdict == 'NORMAL':
@@ -245,9 +198,6 @@ def combine_and_decide(
     }
 
 
-# ================================================================
-# MASTER FUNCTION
-# ================================================================
 
 def run_prediction(raw_df: pd.DataFrame, artifacts: dict) -> dict:
     """
