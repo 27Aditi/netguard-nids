@@ -5,10 +5,6 @@ from nfstream import NFStreamer
 from scapy.all import IP, TCP, UDP, Raw, PcapReader
 
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
 PROTOCOL_MAP = {
     6:   'tcp',
     17:  'udp',
@@ -50,10 +46,6 @@ PORT_TO_SERVICE = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Step 1 — Load PCAP via NFStream
-# ---------------------------------------------------------------------------
-
 def load_pcap(pcap_path: str) -> pd.DataFrame:
     streamer = NFStreamer(source=pcap_path, statistical_analysis=True)
     df = streamer.to_pandas()
@@ -61,9 +53,6 @@ def load_pcap(pcap_path: str) -> pd.DataFrame:
     return df
 
 
-# ---------------------------------------------------------------------------
-# Step 2 — Basic NFStream features (no PCAP needed)
-# ---------------------------------------------------------------------------
 
 def extract_basic_features(df: pd.DataFrame) -> pd.DataFrame:
     raw_df = pd.DataFrame()
@@ -122,16 +111,7 @@ def _get_state(row) -> str:
         return 'URN'
 
 
-# ---------------------------------------------------------------------------
-# Step 3 — Single PCAP pass (collects TTL, swin, RTT, trans_depth,
-#           response_body_len, ftp_login all at once)
-# ---------------------------------------------------------------------------
-
 def _single_pcap_pass(pcap_path: str) -> dict:
-    """
-    Opens the PCAP file exactly once and collects all packet-level data
-    needed for every downstream feature. Returns a dict of maps.
-    """
     sttl_map          = {}
     dttl_map          = {}
     swin_map          = {}
@@ -155,7 +135,7 @@ def _single_pcap_pass(pcap_path: str) -> dict:
             ttl    = pkt[IP].ttl
             proto  = pkt[IP].proto
 
-            # --- port extraction ---
+            
             if pkt.haslayer(TCP):
                 src_port = pkt[TCP].sport
                 dst_port = pkt[TCP].dport
@@ -169,25 +149,25 @@ def _single_pcap_pass(pcap_path: str) -> dict:
             fwd_key = (src_ip, dst_ip, src_port, dst_port, proto)
             rev_key = (dst_ip, src_ip, dst_port, src_port, proto)
 
-            # --- TTL ---
+            
             if fwd_key not in sttl_map:
                 sttl_map[fwd_key] = ttl
             if rev_key not in dttl_map:
                 dttl_map[rev_key] = ttl
 
-            # --- TCP-only features ---
+            
             if pkt.haslayer(TCP):
                 window = pkt[TCP].window
                 flags  = pkt[TCP].flags
                 ts     = float(pkt.time)
 
-                # swin / dwin
+                
                 if fwd_key not in swin_map:
                     swin_map[fwd_key] = window
                 if rev_key not in dwin_map:
                     dwin_map[rev_key] = window
 
-                # RTT (SYN / SYN-ACK / ACK)
+                
                 if flags == 0x02 and fwd_key not in syn_time:
                     syn_time[fwd_key] = ts
                 if flags == 0x12 and rev_key not in synack_time:
@@ -196,18 +176,18 @@ def _single_pcap_pass(pcap_path: str) -> dict:
                     if fwd_key in syn_time:
                         ack_time[fwd_key] = ts
 
-                # payload-based features
+                
                 if pkt.haslayer(Raw):
                     try:
                         payload = pkt[Raw].load.decode('utf-8', errors='ignore')
                     except Exception:
                         payload = ''
 
-                    # trans_depth
+                    
                     if any(payload.startswith(m) for m in http_methods):
                         trans_depth_map[fwd_key] = trans_depth_map.get(fwd_key, 0) + 1
 
-                    # response_body_len
+                    
                     if payload.startswith('HTTP/'):
                         found = False
                         for line in payload.split('\r\n'):
@@ -222,7 +202,7 @@ def _single_pcap_pass(pcap_path: str) -> dict:
                             body = payload.split('\r\n\r\n', 1)[1]
                             response_body_map[fwd_key] = response_body_map.get(fwd_key, 0) + len(body.encode('utf-8'))
 
-                    # ftp_login
+                    
                     if (src_port == 21 or dst_port == 21) and '230' in payload:
                         ftp_login_map[fwd_key] = 1
                         ftp_login_map[rev_key] = 1
@@ -283,9 +263,6 @@ def apply_pcap_features(df: pd.DataFrame, raw_df: pd.DataFrame, maps: dict) -> p
     return raw_df
 
 
-# ---------------------------------------------------------------------------
-# Step 4 — Connection tracking features (window-based)
-# ---------------------------------------------------------------------------
 
 def compute_ct_features(df: pd.DataFrame, raw_df: pd.DataFrame):
     window = deque(maxlen=100)
@@ -333,9 +310,6 @@ def compute_ct_features(df: pd.DataFrame, raw_df: pd.DataFrame):
     return raw_df
 
 
-# ---------------------------------------------------------------------------
-# Step 5 — PCAP-derived application features (handled inside _single_pcap_pass)
-# ---------------------------------------------------------------------------
 
 
 def compute_ct_flw_http_mthd(df: pd.DataFrame, raw_df: pd.DataFrame, trans_depth_map: dict) -> pd.DataFrame:
@@ -360,34 +334,18 @@ def compute_ct_flw_http_mthd(df: pd.DataFrame, raw_df: pd.DataFrame, trans_depth
     return raw_df
 
 
-# ---------------------------------------------------------------------------
-# MASTER FUNCTION
-# ---------------------------------------------------------------------------
-
 def extract_all_features(pcap_path: str) -> pd.DataFrame:
-    """
-    Master function.
-    Input  : path to a .pcap file
-    Output : clean DataFrame with all 32 features ready for prediction
-    """
 
-    # 1. Load via NFStream
     df = load_pcap(pcap_path)
-
-    # 2. Basic features from NFStream output
+    
     raw_df = extract_basic_features(df)
 
-    # 3. Single PCAP pass — collects TTL, swin, RTT, trans_depth,
-    #    response_body_len, ftp_login all at once
     maps = _single_pcap_pass(pcap_path)
-
-    # 4. Apply all PCAP-derived features onto raw_df
+    
     raw_df = apply_pcap_features(df, raw_df, maps)
 
-    # 5. Connection tracking features (needs service, state, sttl already set)
     raw_df = compute_ct_features(df, raw_df)
 
-    # 6. ct_flw_http_mthd (window-based, reuses trans_depth_map from maps)
     raw_df = compute_ct_flw_http_mthd(df, raw_df, maps['trans_depth_map'])
 
     return raw_df
